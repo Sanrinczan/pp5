@@ -1,0 +1,62 @@
+---
+- hosts: wordpress_nodes
+  become: yes
+  vars:
+    blog_path: /var/www/wordpress
+    database_name: adsk_wordpress
+  tasks:
+    - name: "Lets create hello world file"
+      file: 
+        path: ~/HelloWorld
+        state: touch
+    - name: "Install http server"
+      yum:
+        name: httpd
+        state: latest
+    - name: Install PHP module
+      yum:
+        name: "{{item}}"
+        state: latest
+      with_items:
+        - php
+        - php-mysql
+    - name: "Install DB server"
+      yum:
+        name: "{{item}}"
+        state: latest
+      with_items:
+        - mariadb
+        - mariadb-server
+    - name: "Starting MariaDB"
+      service:
+        name: mariadb
+        state: started
+    - name: "Download Wordpress"
+      get_url:
+        url: https://pl.wordpress.org/wordpress-4.9.8-pl_PL.tar.gz
+        dest: ~/wordpress.tar.gz
+    - name: "Unpacking" 
+      unarchive:
+        src: ~/wordpress.tar.gz
+        dest: /var/www/
+        remote_src: yes
+    - name: "Install additional mysql python dependencies"
+      yum: 
+        name: MySQL-python
+        state: present
+    - name: "Setting up database"
+      mysql_db:
+        name: "{{database_name}}"
+        state: present
+    - name: "Configure apache vhost" 
+      template:
+        src: templates/vhosts.conf
+        dest: /etc/httpd/conf.d/wordpress.conf
+    - name: "Start service httpd, if not started"
+      service:
+        name: httpd
+        state: restarted
+    - name: "copy wordpres to destination"
+      template:
+        src: templates/wp-config.php
+        dest: "{{blog_path}}/wp-config.php"
